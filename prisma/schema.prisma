@@ -1,0 +1,187 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+// User roles: ADMIN, APPROVER, VIEWER
+enum UserRole {
+  ADMIN
+  REVIEWER
+  MANAGER
+  FINANCE
+  VIEWER
+}
+
+// Document types
+enum DocumentType {
+  INVOICE
+  CREDIT_NOTE
+}
+
+// Document status through workflow
+enum DocumentStatus {
+  DRAFT
+  PENDING_REVIEWER
+  PENDING_MANAGER
+  PENDING_FINANCE
+  APPROVED
+  REJECTED
+}
+
+// Approval step in workflow
+enum ApprovalStep {
+  STEP_1_REVIEWER
+  STEP_2_MANAGER
+  STEP_3_FINANCE
+}
+
+// Approval action
+enum ApprovalAction {
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(VIEWER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  documents       Document[]      @relation("UploadedDocuments")
+  approvals       Approval[]      @relation("UserApprovals")
+  auditLogs       AuditLog[]      @relation("UserAuditLogs")
+  refreshTokens   RefreshToken[]  @relation("UserRefreshTokens")
+
+  @@map("users")
+}
+
+model Document {
+  id             String         @id @default(cuid())
+  uploaderId     String
+  
+  // Document type and file info
+  type           DocumentType
+  fileName       String
+  filePath       String
+  fileSize       Int
+  mimeType       String
+  
+  // Extracted data from AI
+  invoiceNumber  String?
+  vendorName     String?
+  vendorAddress  String?
+  documentDate   DateTime?
+  dueDate        DateTime?
+  amount         Float?
+  vatAmount      Float?
+  totalAmount    Float?
+  currency       String?
+  description    String?
+  
+  // Extracted raw text for reference
+  rawText        String?
+  
+  // Workflow status
+  status         DocumentStatus @default(DRAFT)
+  currentStep    Int            @default(1)
+  
+  // Duplicate detection
+  isDuplicate    Boolean        @default(false)
+  duplicateOfId  String?
+  
+  // Timestamps
+  extractedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  
+  // Relations
+  uploader       User           @relation("UploadedDocuments", fields: [uploaderId], references: [id])
+  approvals      Approval[]
+  
+  @@index([invoiceNumber])
+  @@index([vendorName])
+  @@index([status])
+  @@index([documentDate])
+  @@index([uploaderId])
+  @@map("documents")
+}
+
+model Approval {
+  id           String         @id @default(cuid())
+  documentId   String
+  approverId   String?        // Nullable - set when approver acts on the document
+  step         ApprovalStep
+  action       ApprovalAction?
+  comment      String?
+  createdAt    DateTime       @default(now())
+  actedAt      DateTime?
+  
+  // Relations
+  document     Document       @relation(fields: [documentId], references: [id])
+  approver     User?          @relation("UserApprovals", fields: [approverId], references: [id])
+  
+  @@unique([documentId, step])
+  @@index([documentId])
+  @@index([approverId])
+  @@map("approvals")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  action       String
+  entityType   String
+  entityId     String
+  details      String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  user         User     @relation("UserAuditLogs", fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  value        String
+  description  String?
+  updatedAt    DateTime @updatedAt
+  
+  @@map("system_settings")
+}
+
+model RefreshToken {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  user         User     @relation("UserRefreshTokens", fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
