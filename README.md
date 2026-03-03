@@ -22,7 +22,7 @@ A secure, enterprise-grade document management system with AI-powered data extra
 
 ## Overview
 
-DocuManage streamlines the processing of financial documents (invoices and credit notes) through an intelligent, role-based approval system. The application leverages AI vision models to automatically extract key data from uploaded documents, reducing manual data entry and accelerating the approval process.
+DocuManage streamlines the processing of financial documents (invoices and credit notes) through an intelligent, role-based approval system. The application leverages AI vision models to automatically extract key data from uploaded documents, reducing manual data entry and accelerating the approval process. 
 
 ### Key Business Value
 
